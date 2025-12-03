@@ -7,12 +7,13 @@ let allMascots = [];
 let currentGalleryIndex = 0;
 
 let voteOpen = true;
-
-// ✅ countdown cache
-let voteStatusCache = null;   // {open, now, startAt, endAt, ...}
+let voteStatusCache = null;
 let tickTimer = null;
 
 function makeBadgeId(name){ return 'score-' + encodeURIComponent(String(name||'')); }
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
 function setStatus(text, ok){
   const el = document.getElementById('voteStatus');
   el.textContent = text || "";
@@ -22,9 +23,6 @@ function showFatal(msg){
   document.getElementById('mascot-grid').innerHTML =
     `<div class="col-12 text-center text-white"><b>เกิดข้อผิดพลาด</b><br><small>${escapeHtml(msg)}</small></div>`;
   alert(msg);
-}
-function escapeHtml(s){
-  return String(s ?? "").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
 function getMediaType(url){
@@ -39,23 +37,32 @@ function getMediaType(url){
   return "unknown";
 }
 
-// ---------------- API ----------------
+// ---------------- API (POST first, JSONP fallback) ----------------
+// ✅ ใส่ timeout ให้ fetch กันค้างนาน
 async function apiFetch(action, payload = {}) {
-  const res = await fetch(WEBAPP_URL, {
-    method: "POST",
-    redirect: "follow",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, ...payload })
-  });
-  const txt = await res.text();
-  try { return JSON.parse(txt); } catch { throw new Error("Bad JSON: " + txt.slice(0, 200)); }
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 6000);
+
+  try {
+    const res = await fetch(WEBAPP_URL, {
+      method: "POST",
+      redirect: "follow",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, ...payload }),
+      signal: controller.signal
+    });
+    const txt = await res.text();
+    try { return JSON.parse(txt); } catch { throw new Error("Bad JSON: " + txt.slice(0, 200)); }
+  } finally {
+    clearTimeout(t);
+  }
 }
 
 function apiJsonp(action, payload = {}) {
   return new Promise((resolve, reject) => {
     const cbName = "__cb_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
-    const timer = setTimeout(() => { cleanup(); reject(new Error("JSONP timeout")); }, 12000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error("JSONP timeout")); }, 8000);
 
     function cleanup(){
       clearTimeout(timer);
@@ -81,47 +88,8 @@ async function api(action, payload = {}) {
   catch { return await apiJsonp(action, payload); }
 }
 
-// ---------------- Countdown UI ----------------
+// ---------------- Countdown + Vote UI ----------------
 function fmt2(n){ return String(n).padStart(2,'0'); }
-
-function renderVoteHeader() {
-  const badge = document.getElementById('voteOpenBadge');
-  if (!badge) return;
-
-  const st = voteStatusCache;
-  if (!st) { badge.textContent = ""; return; }
-
-  voteOpen = !(st.open === false);
-
-  // server-now แบบ sync
-  const now = Date.now();
-  const serverNow = (st.serverTime ?? st.now ?? now);
-  const drift = serverNow - (st._fetchedAt ?? now); // server time at fetch - client time at fetch
-  const nowApprox = now + drift;
-
-  const startAt = st.startAt;
-  const endAt = st.endAt;
-
-  let line1 = voteOpen ? "✅ เปิดโหวตอยู่ตอนนี้" : "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
-  let line2 = "";
-
-  if (startAt && endAt) {
-    if (nowApprox < startAt) {
-      const ms = startAt - nowApprox;
-      line2 = `⏳ เริ่มโหวตในอีก ${msToHMS(ms)}`;
-    } else if (nowApprox <= endAt) {
-      const ms = endAt - nowApprox;
-      line2 = `⏳ เหลือเวลาโหวต ${msToHMS(ms)}`;
-    } else {
-      line2 = `⏳ หมดเวลาโหวตแล้ว`;
-    }
-  } else if (st.windowText) {
-    line2 = `🗓️ ตั้งเวลา: ${st.windowText}`;
-  }
-
-  badge.innerHTML = `${line1}${line2 ? `<br><span class="small">${escapeHtml(line2)}</span>` : ""}`;
-}
-
 function msToHMS(ms){
   ms = Math.max(0, ms|0);
   const total = Math.floor(ms/1000);
@@ -132,23 +100,57 @@ function msToHMS(ms){
   return `${m}น ${fmt2(s)}วิ`;
 }
 
+function applyVotingStateToButtons(){
+  // ✅ ไม่ re-render ทั้งกริดแล้ว (เร็วขึ้น)
+  const btns = document.querySelectorAll('.btn-vote[data-action="vote"]');
+  btns.forEach(b => { b.textContent = voteOpen ? "โหวตเลย" : "รับเลขสุ่ม ⭐"; });
+}
+
+function renderVoteHeader(){
+  const badge = document.getElementById('voteOpenBadge');
+  if (!badge) return;
+
+  const st = voteStatusCache;
+  if (!st){ badge.textContent = ""; return; }
+
+  voteOpen = !(st.open === false);
+
+  const now = Date.now();
+  const serverNow = (st.serverTime ?? st.now ?? now);
+  const drift = serverNow - (st._fetchedAt ?? now);
+  const nowApprox = now + drift;
+
+  const startAt = st.startAt;
+  const endAt = st.endAt;
+
+  let line1 = voteOpen ? "✅ เปิดโหวตอยู่ตอนนี้" : "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
+  let line2 = "";
+
+  if (startAt && endAt) {
+    if (nowApprox < startAt) line2 = `⏳ เริ่มโหวตในอีก ${msToHMS(startAt - nowApprox)}`;
+    else if (nowApprox <= endAt) line2 = `⏳ เหลือเวลาโหวต ${msToHMS(endAt - nowApprox)}`;
+    else line2 = `⏳ หมดเวลาโหวตแล้ว`;
+  } else if (st.windowText) {
+    line2 = `🗓️ ตั้งเวลา: ${st.windowText}`;
+  }
+
+  badge.innerHTML = `${line1}${line2 ? `<br><span class="small">${escapeHtml(line2)}</span>` : ""}`;
+
+  applyVotingStateToButtons();
+}
+
 async function refreshVoteStatusUi(){
   const st = await api('getVoteStatus');
   voteStatusCache = { ...st, _fetchedAt: Date.now() };
   renderVoteHeader();
 
-  // รีเรนเดอร์ปุ่มบนการ์ดให้เปลี่ยนข้อความตามสถานะ
-  if (allMascots && allMascots.length) renderMascots(allMascots);
-
-  if (!tickTimer) {
-    tickTimer = setInterval(renderVoteHeader, 1000); // นับถอยหลังทุก 1 วิ
-  }
+  if (!tickTimer) tickTimer = setInterval(renderVoteHeader, 1000);
 }
 
 // ---------------- Snow + Gallery ----------------
 function createSnowflakes() {
   const snowContainer = document.getElementById('snow-container');
-  const particleCount = 30;
+  const particleCount = 18; // ✅ ลดลงนิด ช่วยเครื่องช้า
   for (let i = 0; i < particleCount; i++) {
     const flake = document.createElement('div');
     flake.classList.add('snowflake');
@@ -179,6 +181,7 @@ function updateGalleryContent(index) {
   const mediaWrapper = document.getElementById('galleryMediaWrapper');
   const titleEl = document.getElementById('galleryTitle');
   const type = getMediaType(mascot.mediaUrl);
+
   const existingVideo = mediaWrapper.querySelector('video');
   if (existingVideo) existingVideo.pause();
 
@@ -252,21 +255,25 @@ function renderMascots(mascots){
     const score = currentScores[m.name] || 0;
     const mediaUrl = String(m.mediaUrl || '').trim();
 
+    // ✅ เร็วขึ้น: ไม่โหลด <video> ในกริด (หนัก) -> ใช้รูปแทน
     let mediaHtml = '';
-    if (mediaUrl) {
-      const type = getMediaType(mediaUrl);
-      if (type === 'video') {
-        mediaHtml = `<video class="mascot-media" playsinline muted>
-          <source src="${escapeHtml(mediaUrl)}" type="video/mp4">
-        </video>`;
-      } else {
-        mediaHtml = `<img class="mascot-media" src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(m.name)}">`;
-      }
+    const type = getMediaType(mediaUrl);
+    if (type === 'image') {
+      mediaHtml = `<img class="mascot-media" loading="lazy" decoding="async"
+        src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(m.name)}">`;
+    } else if (type === 'video') {
+      // show thumbnail (placeholder) + play icon
+      mediaHtml = `
+        <div style="position:relative;">
+          <img class="mascot-media" loading="lazy" decoding="async"
+            src="${escapeHtml(m.placeholderImg)}" alt="${escapeHtml(m.name)}">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+            font-size:42px;color:#fff;text-shadow:0 3px 12px rgba(0,0,0,.6);">▶</div>
+        </div>`;
     } else {
-      mediaHtml = `<img class="mascot-media" src="${escapeHtml(m.placeholderImg)}" alt="${escapeHtml(m.name)}">`;
+      mediaHtml = `<img class="mascot-media" loading="lazy" decoding="async"
+        src="${escapeHtml(m.placeholderImg)}" alt="${escapeHtml(m.name)}">`;
     }
-
-    const btnText = voteOpen ? "โหวตเลย" : "รับเลขสุ่ม ⭐";
 
     container.insertAdjacentHTML('beforeend', `
       <div class="col-6 col-md-4 col-lg-3">
@@ -278,7 +285,9 @@ function renderMascots(mascots){
           <div class="card-body">
             <div class="card-title">${escapeHtml(m.name)}</div>
             <small class="text-muted d-block mb-2">หมายเลข ${escapeHtml(m.id)}</small>
-            <button class="btn-vote" type="button" data-action="vote" data-name="${escapeHtml(m.name)}">${btnText}</button>
+            <button class="btn-vote" type="button" data-action="vote" data-name="${escapeHtml(m.name)}">
+              ${voteOpen ? "โหวตเลย" : "รับเลขสุ่ม ⭐"}
+            </button>
           </div>
         </div>
       </div>
@@ -309,14 +318,7 @@ function renderChart(data){
   myChart = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets: [{ label: 'คะแนนโหวต', data: values, backgroundColor: bgColors, borderColor:'#FFF', borderWidth:2, borderRadius:5 }] },
-    options: {
-      responsive:true,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        y:{ beginAtZero:true, ticks:{ stepSize:1, color: '#0f4023', font: {weight:'bold'} } },
-        x:{ grid:{ display:false }, ticks: { color: '#0f4023', font: {family:'Sarabun', weight:'bold'} } }
-      }
-    }
+    options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true }, x:{ grid:{ display:false } } } }
   });
 }
 
@@ -349,17 +351,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  createSnowflakes();
+  // ✅ ให้หน้า “ขึ้นก่อน” แล้วค่อยทำของหนักทีหลัง
+  setTimeout(createSnowflakes, 0);
 
   try {
-    await refreshVoteStatusUi();
+    // ✅ เรียกพร้อมกัน ลดเวลารวม
+    const [st, mascots] = await Promise.all([
+      api('getVoteStatus'),
+      api('getMascotData'),
+    ]);
 
-    allMascots = await api('getMascotData');
+    voteStatusCache = { ...st, _fetchedAt: Date.now() };
+    renderVoteHeader();
+
+    allMascots = mascots || [];
     renderMascots(allMascots);
 
-    await updateChartData();
-    setInterval(updateChartData, 10000);
-    setInterval(refreshVoteStatusUi, 15000); // sync เวลากับ server เรื่อยๆ
+    // ✅ โหลดกราฟหลังจากหน้าเริ่มเห็นแล้ว
+    setTimeout(async () => {
+      await updateChartData();
+      setInterval(updateChartData, 10000);
+    }, 200);
+
+    setInterval(refreshVoteStatusUi, 15000);
+    if (!tickTimer) tickTimer = setInterval(renderVoteHeader, 1000);
+
   } catch (err) {
     showFatal(err && err.message ? err.message : String(err));
   }
@@ -430,13 +446,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('galleryBackdrop').addEventListener('click', (e) => { if (e.target.id === 'galleryBackdrop') closeGallery(); });
   document.getElementById('galleryNext').addEventListener('click', showNextMedia);
   document.getElementById('galleryPrev').addEventListener('click', showPrevMedia);
-
-  document.addEventListener('keydown', (e) => {
-    const gallery = document.getElementById('galleryBackdrop');
-    if (gallery.style.display === 'flex') {
-      if (e.key === 'Escape') closeGallery();
-      if (e.key === 'ArrowRight') showNextMedia();
-      if (e.key === 'ArrowLeft') showPrevMedia();
-    }
-  });
 });
