@@ -1,5 +1,5 @@
 // 1) ใส่ลิงก์ Web App /exec ของคุณตรงนี้
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbyzydjp198viwySMBhZEgl5RqjLBWW2BfixhPrl1ZWto5A_Ff6DN62nddySDXWCEYH3/exec";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxr2KKP2UbSBYpPCPKr7dzGg6CYd6Y_RGdGTQBxGxm2VVe-mJn1mhrkV7ULjqNFKeD1/exec";
 
 let myChart = null;
 let currentScores = {};
