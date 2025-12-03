@@ -1,0 +1,395 @@
+:root {
+  --xmas-red: #D42426;
+  --xmas-dark-red: #8a1214;
+  --xmas-green: #165B33;
+  --xmas-dark-green: #0f4023;
+  --xmas-gold: #FFD700;
+  --xmas-cream: #FFF5E1;
+  --snow-white: #ffffff;
+}
+
+body {
+  background-color: var(--xmas-dark-green);
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.05) 0%, transparent 20%),
+    radial-gradient(circle at 90% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 20%),
+    linear-gradient(135deg, #165B33 0%, #052b14 100%);
+  font-family: 'Sarabun', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #333;
+}
+
+/* Snow */
+.snowflake {
+  position: fixed;
+  top: -10px;
+  z-index: 9999;
+  color: #FFF;
+  font-size: 1em;
+  opacity: 0.8;
+  pointer-events: none;
+  animation: fall linear forwards;
+}
+@keyframes fall { to { transform: translateY(105vh); } }
+
+/* Header */
+.header-banner {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--xmas-red),
+    var(--xmas-red) 20px,
+    #f0f0f0 20px,
+    #f0f0f0 40px
+  );
+  color: var(--xmas-dark-red);
+  padding: 30px 20px 40px;
+  border-bottom: 8px solid var(--xmas-gold);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.header-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(2px);
+  z-index: 1;
+}
+.header-content { position: relative; z-index: 2; }
+.header-title {
+  font-family: 'Mountains of Christmas', cursive;
+  font-weight: 700;
+  font-size: 3.5rem;
+  color: var(--xmas-red);
+  text-shadow: 3px 3px 0px #fff, 5px 5px 10px rgba(0,0,0,0.2);
+  letter-spacing: 2px;
+}
+.header-subtitle {
+  font-weight: 600;
+  color: var(--xmas-green);
+  background: rgba(255,255,255,0.7);
+  display: inline-block;
+  padding: 5px 15px;
+  border-radius: 20px;
+  margin-top: 5px;
+}
+
+/* Lights */
+.decoration-lights {
+  height: 20px;
+  width: 100%;
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  z-index: 5;
+  background-image:
+    radial-gradient(circle, #ffeb3b 40%, transparent 60%),
+    radial-gradient(circle, #ff1744 40%, transparent 60%),
+    radial-gradient(circle, #00e676 40%, transparent 60%),
+    radial-gradient(circle, #2979ff 40%, transparent 60%);
+  background-size: 50px 50px;
+  background-position: 0 0, 12.5px 0, 25px 0, 37.5px 0;
+  animation: twinkle 1s infinite alternate;
+}
+@keyframes twinkle {
+  0% { opacity: 0.7; filter: brightness(1); }
+  100% { opacity: 1; filter: brightness(1.5); }
+}
+
+/* Containers */
+.chart-container {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 24px;
+  padding: 25px;
+  margin: 30px 0;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.4), inset 0 0 0 2px rgba(255,255,255,0.5);
+  border: 4px solid var(--xmas-gold);
+  position: relative;
+}
+.chart-title{
+  color:var(--xmas-green);
+  font-family:'Mountains of Christmas',cursive;
+  font-size:2.5rem;
+  font-weight:700;
+}
+
+.mascot-card {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  position: relative;
+}
+.mascot-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(45deg, var(--xmas-red), var(--xmas-red) 10px, #fff 10px, #fff 20px);
+  z-index: 5;
+}
+.mascot-card:hover {
+  transform: translateY(-10px) scale(1.02);
+  box-shadow: 0 20px 40px rgba(255, 215, 0, 0.4);
+  z-index: 10;
+}
+
+.mascot-img-wrapper {
+  height: 260px;
+  background: #222;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+.mascot-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+.mascot-card:hover .mascot-media { transform: scale(1.1); }
+
+.vote-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: rgba(212, 36, 38, 0.95);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  z-index: 10;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  border: 2px solid #fff;
+}
+
+.card-body {
+  background: linear-gradient(to bottom, #ffffff, #f4f4f4);
+  padding: 15px;
+  text-align: center;
+  position: relative;
+}
+.card-title {
+  color: var(--xmas-dark-green);
+  font-family: 'Mountains of Christmas', cursive;
+  font-weight: 700;
+  font-size: 1.6rem;
+  margin-bottom: 5px;
+  line-height: 1.2;
+}
+
+.btn-vote {
+  background: linear-gradient(180deg, var(--xmas-red) 0%, #b31b1d 100%);
+  color: #fff;
+  border: none;
+  width: 100%;
+  padding: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.btn-vote:hover {
+  background: linear-gradient(180deg, #e63537 0%, #c41e20 100%);
+  box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
+}
+.btn-vote::after { content: "❄"; position: absolute; right: 15px; opacity: 0.3; font-size: 1.2rem; }
+
+/* Modal */
+.xmodal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 50, 20, 0.85);
+  backdrop-filter: blur(5px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+.xmodal {
+  width: min(520px, 100%);
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 25px 80px rgba(0,0,0,0.6);
+  border: 4px solid var(--xmas-red);
+  animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes modalPop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.xmodal-header {
+  background: var(--xmas-red);
+  background-image: radial-gradient(circle, rgba(255,255,255,0.2) 2px, transparent 3px);
+  background-size: 20px 20px;
+  color: #fff;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 4px solid var(--xmas-gold);
+}
+.xmodal-title { font-family: 'Mountains of Christmas', cursive; font-weight: 700; font-size: 1.8rem; }
+
+.xmodal-close {
+  background: rgba(0,0,0,0.2);
+  border: none;
+  color: #fff;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.2s;
+}
+.xmodal-close:hover { background: rgba(0,0,0,0.4); }
+
+.xmodal-body { padding: 24px; background: #fffaf0; }
+.xmodal-footer {
+  padding: 16px 24px;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  background: #fff;
+  border-top: 1px solid #eee;
+}
+
+.hint { font-size:1rem; color:#555; text-align:center; margin-bottom:15px; }
+.label-green { color:var(--xmas-green); }
+
+.form-control {
+  border: 2px solid #ddd;
+  border-radius: 12px;
+  padding: 10px 15px;
+}
+.form-control:focus {
+  border-color: var(--xmas-green);
+  box-shadow: 0 0 0 4px rgba(22, 91, 51, 0.1);
+}
+
+.statusline { margin-top: 15px; font-size: 1rem; text-align: center; }
+.status-ok { color: var(--xmas-green); font-weight: 800; }
+.status-bad { color: var(--xmas-red); font-weight: 900; }
+
+.btn-primary-x, .btn-secondary-x, .btn-ghost-x {
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-weight: 800;
+  border: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary-x { background: var(--xmas-green); color: #fff; box-shadow: 0 4px 0 #0b3d20; }
+.btn-primary-x:active { transform: translateY(4px); box-shadow: none; }
+.btn-secondary-x { background: var(--xmas-gold); color: var(--xmas-red); box-shadow: 0 4px 0 #d49600; }
+.btn-secondary-x:active { transform: translateY(4px); box-shadow: none; }
+.btn-ghost-x { background: #e0e0e0; color: #555; }
+.btn-ghost-x:hover { background: #d0d0d0; }
+
+.btn-primary-x:disabled, .btn-secondary-x:disabled {
+  opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none;
+}
+
+/* Coupon */
+#couponDisplay {
+  display: none;
+  text-align: center;
+  padding: 30px;
+  margin-top: 20px;
+  background: linear-gradient(135deg, #D42426, #a11b1d);
+  border-radius: 20px;
+  border: 4px dashed var(--xmas-gold);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  color: white;
+  position: relative;
+  overflow: hidden;
+  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+@keyframes popIn { 0%{transform: scale(0.5); opacity:0;} 100%{transform: scale(1); opacity:1;} }
+
+#couponDisplay::before, #couponDisplay::after {
+  content: '❄';
+  position: absolute;
+  font-size: 3rem;
+  color: rgba(255, 255, 255, 0.2);
+  animation: spin 10s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+#couponDisplay::before { top: -10px; left: -10px; }
+#couponDisplay::after { bottom: -10px; right: -10px; animation-direction: reverse; }
+
+#couponDisplay .coupon-title {
+  font-family: 'Mountains of Christmas', cursive;
+  font-size: 2.2rem;
+  color: var(--xmas-gold);
+  text-shadow: 2px 2px 0px #8b0000;
+  margin-bottom: 5px;
+}
+#couponDisplay .coupon-number {
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 900;
+  font-size: 4rem;
+  background: #fff;
+  color: var(--xmas-red);
+  padding: 10px 40px;
+  border-radius: 15px;
+  display: inline-block;
+  box-shadow: inset 0 4px 10px rgba(0,0,0,0.2), 0 5px 15px rgba(0,0,0,0.3);
+  letter-spacing: 4px;
+  margin: 15px 0;
+  border: 2px solid var(--xmas-gold);
+}
+
+/* Gallery */
+.gallery-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 20, 10, 0.95);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+.gallery-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.gallery-media-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 50px rgba(255,255,255,0.1);
+}
+.gallery-media { max-width: 100%; max-height: 80vh; border-radius: 8px; border: 2px solid #333; }
+.gallery-title { color: var(--xmas-gold); font-family:'Mountains of Christmas', cursive; font-size: 2rem; margin-top: 15px; text-shadow: 0 2px 4px #000; }
+.gallery-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+  font-size: 2rem; padding: 10px 20px; cursor: pointer; border-radius: 50%; transition: all 0.3s;
+}
+.gallery-nav:hover { background: var(--xmas-red); border-color: var(--xmas-red); }
+.gallery-nav-prev { left: 20px; }
+.gallery-nav-next { right: 20px; }
+.gallery-close {
+  position: absolute; top: 20px; right: 40px; background: transparent; border: none;
+  color: #fff; font-size: 3rem; cursor: pointer; opacity: 0.7; transition: opacity 0.2s;
+}
+.gallery-close:hover { opacity: 1; color: var(--xmas-red); }
