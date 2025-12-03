@@ -1,4 +1,4 @@
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxYASF8S7JmxvXWKCSJwGhsHkY3lr6QzAaGDjGZiTrStnApXzPVwPDZ3BEttiuyCk7n/exec";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbysNIxqFo6_-ZVJTeXYOzSkELhH_espnFAkTHk9RMKVoiSRJDLuTlXRYtsuAEjF1Uz5/exec";
 
 let myChart = null;
 let currentScores = {};
@@ -6,8 +6,11 @@ let selectedMascot = "";
 let allMascots = [];
 let currentGalleryIndex = 0;
 
-// ✅ เพิ่มตัวแปรสถานะโหวต
 let voteOpen = true;
+
+// ✅ countdown cache
+let voteStatusCache = null;   // {open, now, startAt, endAt, ...}
+let tickTimer = null;
 
 function makeBadgeId(name){ return 'score-' + encodeURIComponent(String(name||'')); }
 function setStatus(text, ok){
@@ -36,7 +39,7 @@ function getMediaType(url){
   return "unknown";
 }
 
-// ---------------- API (POST first, JSONP fallback) ----------------
+// ---------------- API ----------------
 async function apiFetch(action, payload = {}) {
   const res = await fetch(WEBAPP_URL, {
     method: "POST",
@@ -52,10 +55,7 @@ function apiJsonp(action, payload = {}) {
   return new Promise((resolve, reject) => {
     const cbName = "__cb_" + Math.random().toString(36).slice(2);
     const script = document.createElement("script");
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error("JSONP timeout"));
-    }, 12000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error("JSONP timeout")); }, 12000);
 
     function cleanup(){
       clearTimeout(timer);
@@ -78,7 +78,71 @@ function apiJsonp(action, payload = {}) {
 
 async function api(action, payload = {}) {
   try { return await apiFetch(action, payload); }
-  catch (e) { return await apiJsonp(action, payload); }
+  catch { return await apiJsonp(action, payload); }
+}
+
+// ---------------- Countdown UI ----------------
+function fmt2(n){ return String(n).padStart(2,'0'); }
+
+function renderVoteHeader() {
+  const badge = document.getElementById('voteOpenBadge');
+  if (!badge) return;
+
+  const st = voteStatusCache;
+  if (!st) { badge.textContent = ""; return; }
+
+  voteOpen = !(st.open === false);
+
+  // server-now แบบ sync
+  const now = Date.now();
+  const serverNow = (st.serverTime ?? st.now ?? now);
+  const drift = serverNow - (st._fetchedAt ?? now); // server time at fetch - client time at fetch
+  const nowApprox = now + drift;
+
+  const startAt = st.startAt;
+  const endAt = st.endAt;
+
+  let line1 = voteOpen ? "✅ เปิดโหวตอยู่ตอนนี้" : "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
+  let line2 = "";
+
+  if (startAt && endAt) {
+    if (nowApprox < startAt) {
+      const ms = startAt - nowApprox;
+      line2 = `⏳ เริ่มโหวตในอีก ${msToHMS(ms)}`;
+    } else if (nowApprox <= endAt) {
+      const ms = endAt - nowApprox;
+      line2 = `⏳ เหลือเวลาโหวต ${msToHMS(ms)}`;
+    } else {
+      line2 = `⏳ หมดเวลาโหวตแล้ว`;
+    }
+  } else if (st.windowText) {
+    line2 = `🗓️ ตั้งเวลา: ${st.windowText}`;
+  }
+
+  badge.innerHTML = `${line1}${line2 ? `<br><span class="small">${escapeHtml(line2)}</span>` : ""}`;
+}
+
+function msToHMS(ms){
+  ms = Math.max(0, ms|0);
+  const total = Math.floor(ms/1000);
+  const h = Math.floor(total/3600);
+  const m = Math.floor((total%3600)/60);
+  const s = total%60;
+  if (h > 0) return `${h}ชม ${fmt2(m)}น ${fmt2(s)}วิ`;
+  return `${m}น ${fmt2(s)}วิ`;
+}
+
+async function refreshVoteStatusUi(){
+  const st = await api('getVoteStatus');
+  voteStatusCache = { ...st, _fetchedAt: Date.now() };
+  renderVoteHeader();
+
+  // รีเรนเดอร์ปุ่มบนการ์ดให้เปลี่ยนข้อความตามสถานะ
+  if (allMascots && allMascots.length) renderMascots(allMascots);
+
+  if (!tickTimer) {
+    tickTimer = setInterval(renderVoteHeader, 1000); // นับถอยหลังทุก 1 วิ
+  }
 }
 
 // ---------------- Snow + Gallery ----------------
@@ -153,7 +217,6 @@ function openVoteModal(mascotName){
   const voteBtn = document.getElementById('voteConfirmBtn');
   const randomBtn = document.getElementById('getRandomBtn');
 
-  // ✅ ถ้าปิดโหวต: ซ่อนปุ่มยืนยันโหวต แต่ยังให้รับเลขสุ่มได้
   if (!voteOpen) {
     voteBtn.style.display = 'none';
     setStatus("⛔ ปิดโหวตแล้ว (ยังรับเลขสุ่มได้ถ้าเคยโหวต)", false);
@@ -203,7 +266,6 @@ function renderMascots(mascots){
       mediaHtml = `<img class="mascot-media" src="${escapeHtml(m.placeholderImg)}" alt="${escapeHtml(m.name)}">`;
     }
 
-    // ✅ ถ้าปิดโหวต เปลี่ยนปุ่มเป็น “รับเลขสุ่ม”
     const btnText = voteOpen ? "โหวตเลย" : "รับเลขสุ่ม ⭐";
 
     container.insertAdjacentHTML('beforeend', `
@@ -263,21 +325,6 @@ async function updateChartData(){
   renderChart(data);
 }
 
-async function refreshVoteStatusUi(){
-  const st = await api('getVoteStatus');
-  voteOpen = !(st && st.open === false);
-
-  const badge = document.getElementById('voteOpenBadge');
-  if (badge) {
-    badge.textContent = voteOpen
-      ? "✅ เปิดโหวตอยู่ตอนนี้"
-      : "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
-  }
-
-  // ✅ รีเรนเดอร์ปุ่มให้เปลี่ยนข้อความตามสถานะ (โหวต/รับเลขสุ่ม)
-  if (allMascots && allMascots.length) renderMascots(allMascots);
-}
-
 // ---------------- Events ----------------
 document.addEventListener('click', function(e){
   const imgWrapper = e.target.closest('.mascot-img-wrapper');
@@ -312,7 +359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await updateChartData();
     setInterval(updateChartData, 10000);
-    setInterval(refreshVoteStatusUi, 15000);
+    setInterval(refreshVoteStatusUi, 15000); // sync เวลากับ server เรื่อยๆ
   } catch (err) {
     showFatal(err && err.message ? err.message : String(err));
   }
