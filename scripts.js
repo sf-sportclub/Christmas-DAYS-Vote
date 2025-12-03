@@ -1,11 +1,13 @@
-// 1) ใส่ลิงก์ Web App /exec ของคุณตรงนี้
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzhihXlJPjuHYSYfMUYSTKPCmCTojsVxNW04-0c6P-cQ3pDAqD6VoyjD4HUVJ3H0TwF/exec";
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxYASF8S7JmxvXWKCSJwGhsHkY3lr6QzAaGDjGZiTrStnApXzPVwPDZ3BEttiuyCk7n/exec";
 
 let myChart = null;
 let currentScores = {};
 let selectedMascot = "";
 let allMascots = [];
 let currentGalleryIndex = 0;
+
+// ✅ เพิ่มตัวแปรสถานะโหวต
+let voteOpen = true;
 
 function makeBadgeId(name){ return 'score-' + encodeURIComponent(String(name||'')); }
 function setStatus(text, ok){
@@ -35,7 +37,6 @@ function getMediaType(url){
 }
 
 // ---------------- API (POST first, JSONP fallback) ----------------
-// POST ใช้ text/plain เพื่อ “หลบ preflight OPTIONS” :contentReference[oaicite:2]{index=2}
 async function apiFetch(action, payload = {}) {
   const res = await fetch(WEBAPP_URL, {
     method: "POST",
@@ -76,12 +77,8 @@ function apiJsonp(action, payload = {}) {
 }
 
 async function api(action, payload = {}) {
-  try {
-    return await apiFetch(action, payload);
-  } catch (e) {
-    // fallback แก้ CORS/OPTIONS บางเครื่อง/บางเครือข่าย :contentReference[oaicite:3]{index=3}
-    return await apiJsonp(action, payload);
-  }
+  try { return await apiFetch(action, payload); }
+  catch (e) { return await apiJsonp(action, payload); }
 }
 
 // ---------------- Snow + Gallery ----------------
@@ -155,11 +152,18 @@ function openVoteModal(mascotName){
 
   const voteBtn = document.getElementById('voteConfirmBtn');
   const randomBtn = document.getElementById('getRandomBtn');
-  const cancelBtn = document.getElementById('voteCancelBtn');
 
-  voteBtn.style.display = 'inline-block'; voteBtn.disabled = false;
-  randomBtn.style.display = 'inline-block'; randomBtn.disabled = false;
-  cancelBtn.style.display = 'inline-block'; cancelBtn.textContent = 'ยกเลิก';
+  // ✅ ถ้าปิดโหวต: ซ่อนปุ่มยืนยันโหวต แต่ยังให้รับเลขสุ่มได้
+  if (!voteOpen) {
+    voteBtn.style.display = 'none';
+    setStatus("⛔ ปิดโหวตแล้ว (ยังรับเลขสุ่มได้ถ้าเคยโหวต)", false);
+  } else {
+    voteBtn.style.display = 'inline-block';
+    voteBtn.disabled = false;
+  }
+
+  randomBtn.style.display = 'inline-block';
+  randomBtn.disabled = false;
 
   const back = document.getElementById('voteModalBackdrop');
   back.style.display = "flex"; back.setAttribute("aria-hidden", "false");
@@ -199,6 +203,9 @@ function renderMascots(mascots){
       mediaHtml = `<img class="mascot-media" src="${escapeHtml(m.placeholderImg)}" alt="${escapeHtml(m.name)}">`;
     }
 
+    // ✅ ถ้าปิดโหวต เปลี่ยนปุ่มเป็น “รับเลขสุ่ม”
+    const btnText = voteOpen ? "โหวตเลย" : "รับเลขสุ่ม ⭐";
+
     container.insertAdjacentHTML('beforeend', `
       <div class="col-6 col-md-4 col-lg-3">
         <div class="card mascot-card h-100">
@@ -209,7 +216,7 @@ function renderMascots(mascots){
           <div class="card-body">
             <div class="card-title">${escapeHtml(m.name)}</div>
             <small class="text-muted d-block mb-2">หมายเลข ${escapeHtml(m.id)}</small>
-            <button class="btn-vote" type="button" data-action="vote" data-name="${escapeHtml(m.name)}">โหวตเลย</button>
+            <button class="btn-vote" type="button" data-action="vote" data-name="${escapeHtml(m.name)}">${btnText}</button>
           </div>
         </div>
       </div>
@@ -258,10 +265,17 @@ async function updateChartData(){
 
 async function refreshVoteStatusUi(){
   const st = await api('getVoteStatus');
+  voteOpen = !(st && st.open === false);
+
   const badge = document.getElementById('voteOpenBadge');
-  if (!badge) return;
-  if (st && st.open === false) badge.textContent = "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
-  else badge.textContent = "✅ เปิดโหวตอยู่ตอนนี้";
+  if (badge) {
+    badge.textContent = voteOpen
+      ? "✅ เปิดโหวตอยู่ตอนนี้"
+      : "⛔ ปิดโหวตตอนนี้ (ยังรับเลขสุ่มได้)";
+  }
+
+  // ✅ รีเรนเดอร์ปุ่มให้เปลี่ยนข้อความตามสถานะ (โหวต/รับเลขสุ่ม)
+  if (allMascots && allMascots.length) renderMascots(allMascots);
 }
 
 // ---------------- Events ----------------
@@ -295,6 +309,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     allMascots = await api('getMascotData');
     renderMascots(allMascots);
+
     await updateChartData();
     setInterval(updateChartData, 10000);
     setInterval(refreshVoteStatusUi, 15000);
@@ -303,6 +318,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('voteConfirmBtn').addEventListener('click', async function(){
+    if (!voteOpen) { setStatus("⛔ ปิดโหวตแล้ว", false); return; }
+
     const empId = document.getElementById('empIdInput').value.trim();
     const birth = document.getElementById('birthInput').value.trim();
     if (!selectedMascot || !empId || !birth) { setStatus("กรุณากรอกข้อมูลให้ครบ", false); return; }
